@@ -1,116 +1,99 @@
 import Seachbar from './components/Searchbar/Searchbar';
 import ImageGallery from './components/ImageGallery';
 import Container from './components/Container';
-import { Component } from 'react';
-// import axios from 'axios';
+import { useState, useEffect } from 'react';
 import Api from './api/imageApi';
 import Loader from 'react-loader-spinner';
 import 'react-loader-spinner/dist/loader/css/react-spinner-loader.css';
 import Button from './components/Button';
 import Modal from './components/Modal/Modal';
 
-class App extends Component {
-  state = {
-    images: [],
-    isLoading: false,
-    showModal: false,
-    searchQuery: '',
-    currentPage: 1,
-    modalImg: '',
+export default function App() {
+  const [images, setImages] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [modalImg, setModalImg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (searchQuery) {
+      fetchImg();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
+  useEffect(() => {
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: 'smooth',
+    });
+  });
+
+  const onChangeQuery = query => {
+    setSearchQuery(query.trim());
+    setImages([]);
+    setCurrentPage(1);
+    setError(null);
   };
 
-  componentDidUpdate(prevProps, prevState) {
-    if (prevState.searchQuery !== this.state.searchQuery) {
-      this.fetchImg();
-    }
-  }
-
-  fetchImg = () => {
-    const { currentPage, searchQuery } = this.state;
+  const fetchImg = () => {
     const options = { searchQuery, currentPage };
-
-    this.setState({ isLoading: true });
 
     if (!searchQuery) {
       return;
     }
 
+    setIsLoading(true);
+
     Api.fetchImg(options)
-      .then(hits => {
-        this.setState(prevState => ({
-          images: [...prevState.images, ...hits],
-          currentPage: prevState.currentPage + 1,
-        }));
-
-        window.scrollTo({
-          top: document.documentElement.scrollHeight,
-          behavior: 'smooth',
-        });
-      })
-      .catch(error => this.setState({ error }))
-      .finally(() => {
-        this.setState({ isLoading: false });
-      });
+      .then(
+        hits => setImages(prevState => [...prevState, ...hits]),
+        setCurrentPage(prevState => prevState + 1),
+      )
+      .catch(error => setError(error))
+      .finally(() => setIsLoading(false));
   };
 
-  onChangeQuery = query => {
-    this.setState({
-      searchQuery: query.trim(),
-      currentPage: 1,
-      images: [],
-      error: null,
-    });
+  const toggleModal = () => {
+    setShowModal(false);
+    setModalImg('');
   };
 
-  toggleModal = () => {
-    this.setState({
-      showModal: false,
-      modalImg: '',
-    });
+  const openModal = largeImageURL => {
+    setShowModal(true);
+    setModalImg(largeImageURL);
   };
 
-  openModal = largeImageURL => {
-    this.setState({
-      showModal: true,
-      modalImg: largeImageURL,
-    });
+  const shouldRenderLoadMoreButton = images.length > 0 && !isLoading;
 
-    console.log(this.state.modalImg);
-  };
+  return (
+    <>
+      <Seachbar onSubmit={onChangeQuery} />
 
-  render() {
-    const { images, isLoading, error, showModal, modalImg } = this.state;
-    const shouldRenderLoadMoreButton = images.length > 0 && !isLoading;
+      {error && <p>Whoops, something went wrong: {error.message}</p>}
 
-    return (
-      <>
-        <Seachbar onSubmit={this.onChangeQuery} />
+      <Container>
+        {isLoading && (
+          <Loader
+            type="Circles"
+            color="#3f51b5"
+            height={100}
+            width={100}
+            timeout={3000}
+          />
+        )}
+        {<ImageGallery images={images} onImgClick={openModal} />}
 
-        {error && <p>Whoops, something went wrong: {error.message}</p>}
+        {shouldRenderLoadMoreButton && <Button onClick={fetchImg} />}
 
-        <Container>
-          {isLoading && (
-            <Loader
-              type="Circles"
-              color="#3f51b5"
-              height={100}
-              width={100}
-              timeout={3000}
-            />
-          )}
-          {<ImageGallery images={images} onImgClick={this.openModal} />}
-
-          {shouldRenderLoadMoreButton && <Button onClick={this.fetchImg} />}
-
-          {showModal && (
-            <Modal onClose={this.toggleModal}>
-              <img src={modalImg} alt="" />
-            </Modal>
-          )}
-        </Container>
-      </>
-    );
-  }
+        {showModal && (
+          <Modal onClose={toggleModal}>
+            <img src={modalImg} alt="" />
+          </Modal>
+        )}
+      </Container>
+    </>
+  );
 }
-
-export default App;
